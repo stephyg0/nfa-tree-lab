@@ -58,20 +58,45 @@ function exportImage(){
 function saveImage(blob,extension,filename){
  const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`${filename}.${extension}`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
+async function createPng(image){
+ const {svg,width,height}=image;
+ const source=new Blob([svg],{type:'image/svg+xml;charset=utf-8'});
+ const ratio=Math.min(2,16000/width,16000/height,Math.sqrt(24000000/(width*height)));
+ const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.floor(width*ratio));canvas.height=Math.max(1,Math.floor(height*ratio));
+ const ctx=canvas.getContext('2d');if(!ctx)throw Error('Image export is unavailable in this browser. Try SVG.');
+ const url=URL.createObjectURL(source);
+ try{
+  const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('Could not create PNG. Try SVG.'));img.src=url});
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('This tree is too large for PNG. Download SVG instead.');
+  return {blob,scaledDown:ratio<1};
+ }finally{URL.revokeObjectURL(url)}
+}
 async function downloadImage(format){
  if(build().error)return;
  const button=$(format==='png'?'download':'download-svg');button.disabled=true;$('download-status').textContent='Preparing image…';
- let url;
  try{
-  const {svg,width,height,filename}=exportImage();const source=new Blob([svg],{type:'image/svg+xml;charset=utf-8'});
-  if(format==='svg'){saveImage(source,'svg',filename);$('download-status').textContent='SVG download started.';return}
-  const ratio=Math.min(2,16000/width,16000/height,Math.sqrt(24000000/(width*height)));
-  const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.floor(width*ratio));canvas.height=Math.max(1,Math.floor(height*ratio));
-  const ctx=canvas.getContext('2d');if(!ctx)throw Error('Image export is unavailable in this browser. Try SVG.');
-  url=URL.createObjectURL(source);const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('Could not create PNG. Try SVG.'));img.src=url});
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
-  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('This tree is too large for PNG. Download SVG instead.');
-  saveImage(blob,'png',filename);$('download-status').textContent=ratio<1?'PNG download started. Large tree scaled down; SVG preserves full detail.':'PNG download started.';
- }catch(e){$('download-status').textContent=e.message||'Download failed. Please try SVG.'}finally{if(url)URL.revokeObjectURL(url);button.disabled=false}
+  const image=exportImage();
+  if(format==='svg'){saveImage(new Blob([image.svg],{type:'image/svg+xml;charset=utf-8'}),'svg',image.filename);$('download-status').textContent='SVG download started.';return}
+  const {blob,scaledDown}=await createPng(image);
+  saveImage(blob,'png',image.filename);$('download-status').textContent=scaledDown?'PNG download started. Large tree scaled down; SVG preserves full detail.':'PNG download started.';
+ }catch(e){$('download-status').textContent=e.message||'Download failed. Please try SVG.'}finally{button.disabled=false}
 }
-$('download').onclick=()=>downloadImage('png');$('download-svg').onclick=()=>downloadImage('svg');
+async function copyImage(){
+ if(build().error)return;
+ if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined'){
+  $('download-status').textContent='Copying images is not supported in this browser. Use Download PNG instead.';return;
+ }
+ const button=$('copy-image');button.disabled=true;button.textContent='Copying…';$('download-status').textContent='Preparing image…';
+ try{
+  const png=createPng(exportImage());const blob=png.then(result=>result.blob);
+  // Start the clipboard write during the click gesture, before PNG encoding finishes.
+  blob.catch(()=>{});
+  await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+  const {scaledDown}=await png;
+  $('download-status').textContent='Image copied. Paste it with ⌘V or Ctrl+V.'+(scaledDown?' Large tree scaled down; SVG preserves full detail.':'');
+ }catch(e){
+  $('download-status').textContent=e.name==='NotAllowedError'?'Clipboard access was blocked. Allow clipboard access or use Download PNG.':(e.message||'Could not copy the image. Use Download PNG instead.');
+ }finally{button.disabled=false;button.textContent='Copy image'}
+}
+$('download').onclick=()=>downloadImage('png');$('download-svg').onclick=()=>downloadImage('svg');$('copy-image').onclick=copyImage;
