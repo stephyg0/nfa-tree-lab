@@ -9,7 +9,7 @@ function parse(start,accept,text,word){
  const edges=[];const seen=new Set();const states=new Set([start,...finals]);
  text.split('\n').forEach((line,i)=>{if(!line.trim())return;const p=line.split(',').map(x=>x.trim());if(p.length!==3||!valid.test(p[0])||!valid.test(p[2]))throw Error(`Line ${i+1}: use from, symbol, to with valid state names.`);let [from,sym,to]=p;if(sym==='eps'||sym==='ε')sym='';else if(Array.from(sym).length!==1)throw Error(`Line ${i+1}: the symbol must be one character, ε, or eps.`);const key=JSON.stringify([from,sym,to]);if(!seen.has(key)){edges.push({from,sym,to});seen.add(key)}states.add(from);states.add(to)});
  if(states.size>40||edges.length>150)throw Error('Please keep the NFA to at most 40 states and 150 transitions.');
- return {start,finals,edges,chars};
+ return {start,finals,edges,chars,states:[...states]};
 }
 function compute(m){
  // Exact acceptance uses closure; the displayed tree retains every individual transition.
@@ -51,10 +51,10 @@ function compute(m){
  return {nodes,roots:[0],accepted,limited,maxDepth:m.chars.length,acceptingPaths,hasEpsilon:m.edges.some(e=>e.sym===''),hasCycles:nodes.some(n=>n.cycle)};
 }
 
-let model,tree,level=0,selected=0,scale=1;
+let model,tree,level=0,selected=0,scale=1,diagramMode="tree";
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const remainder=n=>model.chars.slice(n.i).join('')||'ε';
-function build(){try{const m=parse($('start').value.trim(),$('accept').value,$('transitions').value,$('word').value);const t=compute(m);model=m;tree=t;level=t.maxDepth;selected=0;$('error').textContent='';$('result').textContent=t.accepted?'String accepted':'String rejected';$('result').style.color=t.accepted?'#147a64':'#a13c49';$('explanation').textContent=t.accepted?'At least one computation consumes the entire string and reaches an accepting state.':'No computation consumes the entire string and reaches an accepting state.';$('word-display').textContent=m.chars.join('')||'ε';$('notice').textContent=[t.limited?'Display limited to 450 nodes. Dashed nodes have hidden branches; the acceptance result remains exact.':'',t.hasEpsilon?'Arrows labeled ε are explicit moves on the same row: they consume no input.':'',t.hasCycles?'↩ marks a repeated configuration on a branch. Its infinite repeated subtree is folded.':''].filter(Boolean).join(' ');render();return {accepted:t.accepted,displayedNodes:t.nodes.length,limited:t.limited}}catch(e){$('error').textContent=e.message;return {error:e.message}}}
+function build(){try{const m=parse($('start').value.trim(),$('accept').value,$('transitions').value,diagramMode==='states'?'':$('word').value);const t=compute(m);model=m;tree=t;level=t.maxDepth;selected=0;$('error').textContent='';$('result').textContent=t.accepted?'String accepted':'String rejected';$('result').style.color=t.accepted?'#147a64':'#a13c49';$('explanation').textContent=t.accepted?'At least one computation consumes the entire string and reaches an accepting state.':'No computation consumes the entire string and reaches an accepting state.';$('word-display').textContent=m.chars.join('')||'ε';$('notice').textContent=[t.limited?'Display limited to 450 nodes. Dashed nodes have hidden branches; the acceptance result remains exact.':'',t.hasEpsilon?'Arrows labeled ε are explicit moves on the same row: they consume no input.':'',t.hasCycles?'↩ marks a repeated configuration on a branch. Its infinite repeated subtree is folded.':''].filter(Boolean).join(' ');render();return {accepted:t.accepted,displayedNodes:t.nodes.length,limited:t.limited}}catch(e){$('error').textContent=e.message;return {error:e.message}}}
 function stateLabel(s){
  const match=s.match(/^(.+?)(\d+)$/u);
  return match?`${esc(match[1])}<tspan baseline-shift="sub" font-size="12">${esc(match[2])}</tspan>`:esc(s);
@@ -102,6 +102,7 @@ function diagram(viewLevel, selection, fullLabels=false){
  return {w,h,out};
 }
 function render(){
+ viewControls();if(diagramMode==='states'){renderStateDiagram();return;}
  const {w,h,out}=diagram(level,selected);const svg=$('tree');svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('width',w*scale);svg.setAttribute('height',h*scale);svg.innerHTML=out;$('level').textContent=`${level} / ${tree.maxDepth} symbols`;$('back').disabled=level===0;$('next').disabled=level===tree.maxDepth;$('all').disabled=level===tree.maxDepth;$('zoom').textContent=Math.round(scale*100)+'%';
  const n=tree.nodes[selected],chain=[];let c=n;
  while(c){chain.unshift(c);c=c.parent===null?null:tree.nodes[c.parent];}
@@ -109,11 +110,12 @@ function render(){
  $('detail').textContent=trace+'. '+(n.accept?'All input consumed in an accepting state. This path accepts.':n.cycle?'This configuration already appeared on this branch; the repeated subtree is folded.':n.cut?'Further branches are hidden by the display limit.':n.dead?n.i===model.chars.length?'All input consumed, but this state is not accepting.':'No transition can consume the next symbol on this branch.':`${n.i} of ${model.chars.length} symbols consumed. Unread input: ${remainder(n)}.`);
 
 }
-$('build').onclick=build;$('word').onkeydown=e=>{if(e.key==='Enter')build()};$('example').onchange=()=>{const e=examples[$('example').value];for(const k of ['start','accept','word','transitions'])$(k).value=e[k];build()};$('root').onclick=()=>{level=0;selected=0;render()};$('back').onclick=()=>{level--;if(tree.nodes[selected].depth>level)selected=0;render()};$('next').onclick=()=>{level++;render()};$('all').onclick=()=>{level=tree.maxDepth;render()};$('zoomout').onclick=()=>{scale=Math.max(.4,scale-.2);render()};$('zoomin').onclick=()=>{scale=Math.min(2,scale+.2);render()};function pick(e){const n=e.target.closest('[data-id]');if(n){selected=Number(n.dataset.id);render()}}$('tree').onclick=pick;$('tree').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(e)}};
+$('build').onclick=build;$('word').onkeydown=e=>{if(e.key==='Enter')build()};$('example').onchange=()=>{const e=examples[$('example').value];for(const k of ['start','accept','word','transitions'])$(k).value=e[k];build()};$('root').onclick=()=>{level=0;selected=0;render()};$('back').onclick=()=>{level--;if(tree.nodes[selected].depth>level)selected=0;render()};$('next').onclick=()=>{level++;render()};$('all').onclick=()=>{level=tree.maxDepth;render()};$('zoomout').onclick=()=>{scale=Math.max(.4,scale-.2);render()};$('zoomin').onclick=()=>{scale=Math.min(2,scale+.2);render()};function pick(e){if(diagramMode==='states'){const state=e.target.closest('[data-state]');if(state)describeState(state.getAttribute('data-state'));return;}const n=e.target.closest('[data-id]');if(n){selected=Number(n.dataset.id);render()}}$('tree').onclick=pick;$('tree').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(e)}};
 build();
-if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'build_nfa_tree',description:'Set an NFA and input string and build its computation tree.',inputSchema:{type:'object',properties:{start:{type:'string'},accept:{type:'string'},transitions:{type:'string'},word:{type:'string'}},required:['start','accept','transitions','word'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){if(!input||['start','accept','transitions','word'].some(k=>typeof input[k]!=='string'))throw Error('All four fields must be strings.');parse(input.start.trim(),input.accept,input.transitions,input.word);for(const k of ['start','accept','transitions','word'])$(k).value=input[k];return build()}})).catch(()=>{})}catch{}}
+if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'build_nfa_tree',description:'Set an NFA and input string and build its computation tree.',inputSchema:{type:'object',properties:{start:{type:'string'},accept:{type:'string'},transitions:{type:'string'},word:{type:'string'}},required:['start','accept','transitions','word'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){if(!input||['start','accept','transitions','word'].some(k=>typeof input[k]!=='string'))throw Error('All four fields must be strings.');parse(input.start.trim(),input.accept,input.transitions,input.word);diagramMode='tree';for(const k of ['start','accept','transitions','word'])$(k).value=input[k];return build()}})).catch(()=>{})}catch{}}
 
 function exportImage(){
+ if(diagramMode==='states')return exportStateDiagram();
  const {w,h,out}=diagram(tree.maxDepth,-1,true);
  const width=Math.max(800,w+48);
  const subtitle=`Input: ${model.chars.join('')||'ε'}   |   Start: ${model.start}   |   Accepting: ${[...model.finals].join(', ')||'none'}`;
@@ -168,3 +170,78 @@ async function copyImage(){
  }finally{button.disabled=false;button.textContent='Copy image'}
 }
 $('download').onclick=()=>downloadImage('png');$('download-svg').onclick=()=>downloadImage('svg');$('copy-image').onclick=copyImage;
+function stateDiagram(){
+ const names=model.states, count=names.length;
+ const radius=count<2?0:Math.max(125,count*34),margin=150;
+ const w=Math.max(580,radius*2+margin*2),h=Math.max(400,radius*2+margin*2),cx=w/2,cy=h/2;
+ const pos=new Map();
+ names.forEach((s,i)=>{const angle=Math.PI+2*Math.PI*i/count;pos.set(s,{x:cx+radius*Math.cos(angle),y:cy+radius*Math.sin(angle),angle});});
+ const groups=new Map();for(const e of model.edges){const key=JSON.stringify([e.from,e.to]);if(!groups.has(key))groups.set(key,{from:e.from,to:e.to,symbols:[]});groups.get(key).symbols.push(e.sym||'ε');}
+ let out='<title>NFA state diagram. Labeled arrows show transitions, the incoming start arrow marks the initial state, and double circles mark accepting states.</title><defs><marker id="state-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 L3 5 Z" fill="#172847"/></marker></defs>';
+ const labels=[];
+ for(const g of groups.values()){
+  const p=pos.get(g.from),q=pos.get(g.to);let d,lx,ly;
+  if(g.from===g.to){
+   // Loops extend outward from the circular layout, away from other states.
+   const ux=Math.cos(p.angle),uy=Math.sin(p.angle),tx=-uy,ty=ux;
+   const a={x:p.x+ux*22+tx*19,y:p.y+uy*22+ty*19},b={x:p.x+ux*22-tx*19,y:p.y+uy*22-ty*19};
+   d=`M${a.x} ${a.y} C${p.x+ux*100+tx*60} ${p.y+uy*100+ty*60},${p.x+ux*100-tx*60} ${p.y+uy*100-ty*60},${b.x} ${b.y}`;
+   lx=p.x+ux*97;ly=p.y+uy*97;
+  }else{
+   const dx=q.x-p.x,dy=q.y-p.y,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len;
+   const reciprocal=groups.has(JSON.stringify([g.to,g.from]));
+   const bend=reciprocal?48:count>3?18:0;
+   const c={x:(p.x+q.x)/2-uy*bend,y:(p.y+q.y)/2+ux*bend};
+   const startLen=Math.hypot(c.x-p.x,c.y-p.y),endLen=Math.hypot(q.x-c.x,q.y-c.y);
+   const a={x:p.x+(c.x-p.x)*30/startLen,y:p.y+(c.y-p.y)*30/startLen};
+   const b={x:q.x-(q.x-c.x)*32/endLen,y:q.y-(q.y-c.y)*32/endLen};
+   d=`M${a.x} ${a.y} Q${c.x} ${c.y} ${b.x} ${b.y}`;
+   lx=(a.x+2*c.x+b.x)/4;ly=(a.y+2*c.y+b.y)/4;
+  }
+  const label=g.symbols.join(', ');out+=`<path class="state-edge" data-from="${esc(g.from)}" data-to="${esc(g.to)}" d="${d}" fill="none" stroke="#172847" stroke-width="1.6" marker-end="url(#state-arrow)"/>`;
+  const lines=[];let line='';for(const symbol of g.symbols){if(line.length+symbol.length>14){lines.push(line);line=symbol}else line+=(line?', ':'')+symbol;}if(line)lines.push(line);
+  const boxWidth=Math.max(...lines.map(x=>Array.from(x).length))*9+14,boxHeight=lines.length*21+4;
+  labels.push(`<g class="state-edge-label"><title>${esc(`${g.from} → ${g.to}: ${label}`)}</title><rect x="${lx-boxWidth/2}" y="${ly-boxHeight/2}" width="${boxWidth}" height="${boxHeight}" rx="4" fill="white"/>${lines.map((line,i)=>`<text x="${lx}" y="${ly-boxHeight/2+18+i*21}" text-anchor="middle" font-size="17" fill="#172847">${esc(line)}</text>`).join('')}</g>`);
+ }
+ out+=labels.join('');
+ const start=pos.get(model.start);
+ out+=`<path class="start-arrow" d="M${start.x-76} ${start.y+68} L${start.x-23} ${start.y+23}" stroke="#172847" stroke-width="1.6" fill="none" marker-end="url(#state-arrow)"/><text x="${start.x-78}" y="${start.y+89}" font-size="14" fill="#526278">Start</text>`;
+ for(const s of names){const p=pos.get(s);out+=`<g class="node state-node" data-state="${esc(s)}" tabindex="0" role="button" aria-label="${esc(s+(s===model.start?', start state':'')+(model.finals.has(s)?', accepting state':''))}"><circle cx="${p.x}" cy="${p.y}" r="29" fill="white" stroke="#172847" stroke-width="1.6"/>${model.finals.has(s)?`<circle class="accepting-state" cx="${p.x}" cy="${p.y}" r="24" fill="none" stroke="#172847" stroke-width="1.3"/>`:''}<text x="${p.x}" y="${p.y+5}" text-anchor="middle" font-size="21" font-style="italic" ${s.length>5?'textLength="45" lengthAdjust="spacingAndGlyphs"':''} fill="#172847">${stateLabel(s)}</text></g>`;}
+ return {w,h,out};
+}
+function setView(next){
+ const previous=diagramMode;diagramMode=next;
+ const result=build();if(result.error){diagramMode=previous;render();return;}
+ $('download-status').textContent='';
+}
+function viewControls(){
+ const states=diagramMode==='states';
+ $('view-tree').setAttribute('aria-pressed',String(!states));$('view-states').setAttribute('aria-pressed',String(states));
+ $('diagram-title').textContent=states?'State diagram':'Computation tree';
+ $('build').textContent=states?'Build state diagram':'Build tree';
+ $('input-string-controls').hidden=states;$('step-controls').hidden=states;$('word-display').hidden=states;
+ $('legend').innerHTML=states?'<span>Incoming arrow = start</span><span>Double circle = accepting state</span><span>ε = no input consumed</span>':'<span>Double circle = accepts here</span><span>Bold path = accepting computation</span><span>ε arrow = no input consumed</span>';
+ $('inspector-title').textContent=states?'State details':'Selected path';
+ $('tree').setAttribute('aria-label',states?'NFA state diagram':'NFA computation tree');
+ $('viewport').setAttribute('aria-label',states?'State diagram, scroll to explore':'Computation tree, scroll to explore');
+}
+function renderStateDiagram(){
+ const {w,h,out}=stateDiagram(),svg=$('tree');svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.setAttribute('width',w*scale);svg.setAttribute('height',h*scale);svg.innerHTML=out;
+ $('zoom').textContent=Math.round(scale*100)+'%';$('result').textContent=`${model.states.length} states · ${model.edges.length} transitions`;$('result').style.color='#526278';
+ $('explanation').textContent='All defined transitions are shown, independently of an input string.';
+ $('notice').textContent=model.states.length>12?'Large diagram: zoom out or use SVG to inspect all transitions.':'';
+ $('detail').textContent='Click a state to see its incoming and outgoing transitions.';
+}
+function describeState(s){
+ const outgoing=model.edges.filter(e=>e.from===s).map(e=>`${e.sym||'ε'} → ${e.to}`),incoming=model.edges.filter(e=>e.to===s).map(e=>`${e.from} —${e.sym||'ε'}→ ${s}`);
+ $('detail').textContent=`${s}${s===model.start?' (start)':''}${model.finals.has(s)?' (accepting)':''}. Outgoing: ${outgoing.join('; ')||'none'}. Incoming: ${incoming.join('; ')||'none'}.`;
+}
+function exportStateDiagram(){
+ const {w,h,out}=stateDiagram(),width=Math.max(800,w+48),height=h+145;
+ const caption=`Start: ${model.start} · Accepting: ${[...model.finals].join(', ')||'none'}`;
+ const lines=caption.match(/.{1,90}/gu)||[''];const top=85+(lines.length-1)*19,totalHeight=height+(lines.length-1)*19;
+ return {width,height:totalHeight,filename:'nfa-state-diagram',svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalHeight}" viewBox="0 0 ${width} ${totalHeight}"><rect width="100%" height="100%" fill="white"/><style>text{font-family:Georgia,Times New Roman,serif}</style><text x="24" y="34" font-size="23" fill="#172847">NFA state diagram</text>${lines.map((line,i)=>`<text x="24" y="${62+i*19}" font-size="14" fill="#526278">${esc(line)}</text>`).join('')}<g transform="translate(${(width-w)/2},${top})">${out}</g><text x="24" y="${totalHeight-24}" font-size="13" fill="#526278">Incoming arrow = start. Double circle = accepting state. ε consumes no input.</text></svg>`};
+}
+
+$('view-tree').onclick=()=>setView('tree');$('view-states').onclick=()=>setView('states');
+if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'build_nfa_state_diagram',description:'Set an NFA and display its state diagram, including all transitions and epsilon moves.',inputSchema:{type:'object',properties:{start:{type:'string'},accept:{type:'string'},transitions:{type:'string'}},required:['start','accept','transitions'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){if(!input||['start','accept','transitions'].some(k=>typeof input[k]!=='string'))throw Error('Start, accept, and transitions must be strings.');parse(input.start.trim(),input.accept,input.transitions,'');for(const k of ['start','accept','transitions'])$(k).value=input[k];diagramMode='states';const result=build();return result.error?result:{states:model.states.length,transitions:model.edges.length,view:'states'};}})).catch(()=>{})}catch{}}
