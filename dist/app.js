@@ -114,16 +114,13 @@ $('build').onclick=build;$('word').onkeydown=e=>{if(e.key==='Enter')build()};$('
 build();
 if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'build_nfa_tree',description:'Set an NFA and input string and build its computation tree.',inputSchema:{type:'object',properties:{start:{type:'string'},accept:{type:'string'},transitions:{type:'string'},word:{type:'string'}},required:['start','accept','transitions','word'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute(input){if(!input||['start','accept','transitions','word'].some(k=>typeof input[k]!=='string'))throw Error('All four fields must be strings.');parse(input.start.trim(),input.accept,input.transitions,input.word);$('machine').value='nfa';machineControls();diagramMode='tree';for(const k of ['start','accept','transitions','word'])$(k).value=input[k];return build()}})).catch(()=>{})}catch{}}
 
+function diagramImage(d,filename){
+ const {w,h,out}=d;
+ return {width:w,height:h,filename,svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="100%" height="100%" fill="white"/><style>text{font-family:Georgia,Times New Roman,serif}</style>${out}</svg>`};
+}
 function exportImage(){
  if(diagramMode==='states')return exportStateDiagram();
- const {w,h,out}=diagram(tree.maxDepth,-1,true);
- const width=Math.max(800,w+48);
- const subtitle=`Input: ${model.chars.join('')||'ε'}   |   Start: ${model.start}   |   Accepting: ${[...model.finals].join(', ')||'none'}`;
- const lines=Array.from(subtitle).join('').match(/.{1,92}/gu)||[''];
- const top=85+(lines.length-1)*19,height=h+top+135;
- const notes=[model.pda?'Stack top is on the left. Initial stack is empty. Acceptance is by final state after all input is read.':'',tree.limited?'DISPLAY LIMITED: hidden branches remain (450 nodes).':'',tree.hasEpsilon?'ε arrows connect states without consuming input; ↩ marks a folded repeating branch.':''].filter(Boolean);
- const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="white"/><style>text{font-family:Georgia,Times New Roman,serif}</style><text x="24" y="34" font-family="sans-serif" font-size="21" fill="#253247">${model.pda?'PDA':'NFA'} computation tree — ${tree.accepted===null?'search incomplete':tree.accepted?'accepted':'rejected'}</text>${lines.map((line,i)=>`<text x="24" y="${62+i*19}" font-size="13" fill="#526278">${esc(line)}</text>`).join('')}<g transform="translate(${(width-w)/2},${top})">${out}</g><text x="24" y="${height-108}" font-size="12" fill="#526278">Each row consumes one symbol. Double circles mark accepting configurations with all input read; bold paths accept.</text>${notes.map((n,i)=>`<text x="24" y="${height-85+i*19}" font-size="12" fill="#805c15">${esc(n)}</text>`).join('')}</svg>`;
- return {svg,width,height,filename:`${model.pda?'pda':'nfa'}-tree-${(model.chars.join('')||'empty').replace(/[^a-zA-Z0-9_-]/g,'_')}`};
+ return diagramImage(diagram(tree.maxDepth,-1,true),`${model.pda?'pda':'nfa'}-tree-${(model.chars.join('')||'empty').replace(/[^a-zA-Z0-9_-]/g,'_')}`);
 }
 function saveImage(blob,extension,filename){
  const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`${filename}.${extension}`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
@@ -237,10 +234,7 @@ function describeState(s){
  $('detail').textContent=`${s}${s===model.start?' (start)':''}${model.finals.has(s)?' (accepting)':''}. Outgoing: ${outgoing.join('; ')||'none'}. Incoming: ${incoming.join('; ')||'none'}.`;
 }
 function exportStateDiagram(){
- const {w,h,out}=stateDiagram(),width=Math.max(800,w+48),height=h+145;
- const caption=`Start: ${model.start} · Accepting: ${[...model.finals].join(', ')||'none'}`;
- const lines=caption.match(/.{1,90}/gu)||[''];const top=85+(lines.length-1)*19,totalHeight=height+(lines.length-1)*19;
- return {width,height:totalHeight,filename:model.pda?'pda-state-diagram':'nfa-state-diagram',svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalHeight}" viewBox="0 0 ${width} ${totalHeight}"><rect width="100%" height="100%" fill="white"/><style>text{font-family:Georgia,Times New Roman,serif}</style><text x="24" y="34" font-size="23" fill="#172847">${model.pda?'PDA':'NFA'} state diagram</text>${lines.map((line,i)=>`<text x="24" y="${62+i*19}" font-size="14" fill="#526278">${esc(line)}</text>`).join('')}<g transform="translate(${(width-w)/2},${top})">${out}</g><text x="24" y="${totalHeight-24}" font-size="13" fill="#526278">Incoming arrow = start. Double circle = accepting state. ε consumes no input.</text></svg>`};
+ return diagramImage(stateDiagram(),model.pda?'pda-state-diagram':'nfa-state-diagram');
 }
 
 $('view-tree').onclick=()=>setView('tree');$('view-states').onclick=()=>setView('states');
