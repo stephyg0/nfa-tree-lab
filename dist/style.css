@@ -3,3 +3,5 @@
 [hidden]{display:none!important}.view-switch{display:inline-flex;gap:4px;padding:4px;border:1px solid #e4e8ef;border-radius:9px;background:#f6f8fb;margin-bottom:24px}.view-switch button{border-color:transparent;background:transparent}.view-switch button[aria-pressed="true"]{background:#fff;border-color:#cbd5e3;color:#285ddd;font-weight:600}.toolbar:has(#step-controls[hidden]){justify-content:flex-end}
 
 #machine{margin-bottom:12px}
+
+.symbol-palette{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}.symbol-palette button{min-width:38px;min-height:38px;font-size:17px;color:#253247}.transition-builder{margin:12px 0;border:1px solid #d7dde6;border-radius:7px;padding:10px}.transition-builder summary{cursor:pointer;font-size:14px;font-weight:600}.edge-fields{display:grid;gap:10px;margin:12px 0}.edge-fields input{font-size:16px}.transition-builder button{white-space:normal}#empty-word{font-size:14px}.hint{font-size:14px}code{font-size:13px}
