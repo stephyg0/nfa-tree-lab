@@ -1,6 +1,6 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict');
 const elements={};const document={getElementById(id){return elements[id]??={value:({start:'q0',accept:'q1',word:'01010',transitions:'q0, 0, q1',machine:'nfa'})[id]??'',style:{},setAttribute(){}}}};
-const ctx=vm.createContext({document});vm.runInContext(fs.readFileSync('dist/pda.js','utf8')+fs.readFileSync('dist/app.js','utf8'),ctx);const run=s=>vm.runInContext(s,ctx);
+const ctx=vm.createContext({document});vm.runInContext(fs.readFileSync('public/pda.js','utf8')+fs.readFileSync('public/app.js','utf8'),ctx);const run=s=>vm.runInContext(s,ctx);
 run("loadExample('palindrome')");assert.equal(run('tree.accepted'),true);
 const paths=run("tree.nodes.filter(n=>n.accept).map(n=>{const path=[];while(n){path.unshift([n.s,n.i,n.stack.join('')]);n=n.parent===null?null:tree.nodes[n.parent]}return path})");
 assert.deepEqual(JSON.parse(JSON.stringify(paths)),[[['q1',0,''],['q2',0,'$'],['q2',1,'1$'],['q2',2,'01$'],['q3',2,'01$'],['q3',3,'1$'],['q3',4,'$'],['q4',4,'']]]);

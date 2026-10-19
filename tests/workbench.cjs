@@ -1,7 +1,7 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict');
 const elements={};function element(){return {value:'',style:{},children:[],listeners:{},setAttribute(){},addEventListener(k,f){this.listeners[k]=f},replaceChildren(){this.children=[]},appendChild(e){this.children.push(e)},focus(){this.listeners.focus?.()},setRangeText(s,a,b){this.value=this.value.slice(0,a)+s+this.value.slice(b);this.selectionStart=this.selectionEnd=a+s.length},dispatchEvent(e){this.listeners[e.type]?.()}}}
 const document={getElementById(id){return elements[id]??=element()},createElement:element};for(const [id,value]of Object.entries({machine:'nfa',start:'q0',accept:'q1',transitions:'q0, α, q1',word:'α'}))document.getElementById(id).value=value;
-const ctx=vm.createContext({document,Event:class{constructor(type){this.type=type}}});for(const file of ['pda.js','app.js','symbol-input.js','workbench.js'])vm.runInContext(fs.readFileSync('dist/'+file,'utf8'),ctx);const run=s=>vm.runInContext(s,ctx);
+const ctx=vm.createContext({document,Event:class{constructor(type){this.type=type}}});for(const file of ['pda.js','app.js','symbol-input.js','workbench.js'])vm.runInContext(fs.readFileSync('public/'+file,'utf8'),ctx);const run=s=>vm.runInContext(s,ctx);
 
 assert.equal(run('diagramMode'),'states');assert.equal(elements.machine.value,'dfa');assert.equal(run('model.dfa'),true);
 assert.throws(()=>run("parseDfa('q0','q1','q0, eps, q1','')"),/ε-transitions/);
