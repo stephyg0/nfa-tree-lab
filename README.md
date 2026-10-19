@@ -25,3 +25,7 @@ The importer accepts PNG/JPEG/WebP images up to 6 MB or text up to 12,000 charac
 Output is a proposed machine, not a correctness guarantee. Users review transcription, assumptions and editable transitions, then explicitly apply the draft. Unclear or unsupported questions are returned for clarification. The editor validates machine syntax and DFA completeness before replacement. Importer tests use mocked AI outputs; live model/image recognition has not been tested pending setup.
 
 API references: https://developers.openai.com/api/docs/guides/images-vision and https://developers.openai.com/api/docs/guides/structured-outputs
+
+### Import from chat (no API key)
+
+Choose **Import from chat**, copy its prompt into your chat with a screenshot or question, then paste the returned JSON into the app. JSON code fences are accepted. The import runs locally with no API call. Review/edit the proposed machine and confirm before replacing the current diagram. The prompt documents the DFA/NFA/PDA transition format. Direct screenshot recognition remains an optional server feature requiring AI setup.

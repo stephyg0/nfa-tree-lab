@@ -1,7 +1,7 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Automata Lab · DFA, NFA & PDA</title><meta name="description" content="Build state diagrams and trace strings with DFA, NFA and PDA machines."><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23285ddd'/%3E%3Cpath d='M16 8v8M8 24l8-8 8 8' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E"><link rel="stylesheet" href="style.css?v=import-1"></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Automata Lab · DFA, NFA & PDA</title><meta name="description" content="Build state diagrams and trace strings with DFA, NFA and PDA machines."><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23285ddd'/%3E%3Cpath d='M16 8v8M8 24l8-8 8 8' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E"><link rel="stylesheet" href="style.css?v=chat-import-1"></head>
 <body>
-<header><div class="brand"><span class="brand-icon" aria-hidden="true">↳</span><div><h1>Automata Lab</h1><span>DFA · NFA · PDA</span></div></div><div class="header-actions"><button id="question-open" class="primary">Import question</button><button id="reference-toggle" aria-expanded="false" aria-controls="reference-panel">Quick reference</button></div></header>
+<header><div class="brand"><span class="brand-icon" aria-hidden="true">↳</span><div><h1>Automata Lab</h1><span>DFA · NFA · PDA</span></div></div><div class="header-actions"><button id="question-open" class="primary">Import from chat</button><button id="reference-toggle" aria-expanded="false" aria-controls="reference-panel">Quick reference</button></div></header>
 <section id="reference-panel" class="reference" hidden aria-label="Quick reference">
 <div><h2>DFA</h2><p>Exactly one transition for each state and alphabet symbol. No ε-moves. Add a dead state for otherwise missing transitions.</p></div>
 <div><h2>NFA</h2><p>Zero, one, or many transitions per symbol. ε consumes nothing. A string accepts if any branch reads all input and ends in a final state.</p></div>
@@ -43,15 +43,22 @@ q2, eps, q0</textarea><p class="hint">Use eps or ε for no input. In PDA mode, u
 </section></main>
 
 <dialog id="question-dialog" aria-labelledby="question-title">
-<div class="dialog-heading"><div><h2 id="question-title">Start from a question</h2><p class="hint">Drop a screenshot or paste the question. Review the proposed machine before using it.</p></div><button id="question-close" aria-label="Close question importer">×</button></div>
+<div class="dialog-heading"><div><h2 id="question-title">Import from chat</h2><p class="hint">Turn a question into a diagram with help from your chat. No API key needed.</p></div><button id="question-close" aria-label="Close question importer">×</button></div>
+<section aria-label="Import from chat">
+<ol class="chat-steps"><li>Upload your question or screenshot in this chat.</li><li>Copy the prompt below into chat to request a compatible answer.</li><li>Paste the JSON answer here, then review the machine.</li></ol>
+<details><summary>Prompt to use in chat</summary><textarea id="chat-prompt" rows="7" readonly aria-label="Prompt to copy into chat"></textarea><button id="chat-copy-prompt">Copy prompt</button></details>
+<label for="chat-answer">Formatted answer from chat</label><textarea id="chat-answer" rows="6" maxlength="50000" spellcheck="false" placeholder='Paste the JSON answer here (with or without its code block).'></textarea>
+<p class="hint">Processed only in your browser. Review the proposed machine against your question before applying it.</p><button id="chat-review" class="primary">Review imported machine</button>
+</section>
+<details id="direct-question"><summary>Read a screenshot directly (requires AI setup)</summary>
 <p id="question-setup" class="setup-notice">Automatic reading is awaiting AI setup. You can preview a screenshot here; diagram editing still works.</p>
 <div id="question-drop" class="question-drop"><strong>Drop a screenshot here</strong><span>or paste an image with ⌘V / Ctrl+V</span><button id="question-browse">Choose image</button><input id="question-file" type="file" accept="image/png,image/jpeg,image/webp" hidden><small>PNG, JPEG, WebP · up to 6 MB</small></div>
 <img id="question-preview" alt="Your question screenshot" hidden><div class="question-image-controls"><span id="question-filename"></span><button id="question-remove" class="text-button">Remove image</button></div>
 <label for="question-text">Question or additional context</label><textarea id="question-text" rows="3" maxlength="12000" placeholder="e.g. Build a DFA over {a, b} that accepts strings ending in ab."></textarea>
-<p class="hint">When you choose Read question, the screenshot and text are sent to OpenAI for analysis. They are not saved by this app.</p><button id="question-read" class="primary" disabled>Read question</button><p id="question-status" role="status" aria-live="polite"></p>
-<section id="draft-review" hidden><h3>Review the reading</h3><pre id="question-transcription" class="question-reading"></pre><p id="question-explanation"></p><p id="question-warnings" class="setup-notice"></p>
+<p class="hint">When you choose Read question, the screenshot and text are sent to OpenAI for analysis. They are not saved by this app.</p><button id="question-read" class="primary" disabled>Read question</button></details><p id="question-status" role="status" aria-live="polite"></p>
+<section id="draft-review" hidden><h3>Review the proposed machine</h3><pre id="question-transcription" class="question-reading"></pre><p id="question-explanation"></p><p id="question-warnings" class="setup-notice"></p>
 <div id="draft-fields"><div class="fields"><label>Machine type<select id="draft-machine"><option value="dfa">DFA</option><option value="nfa">NFA</option><option value="pda">PDA</option></select></label><label id="draft-alphabet-label">Alphabet<input id="draft-alphabet"></label></div><div class="fields"><label>Start state<input id="draft-start"></label><label>Final states<input id="draft-accept"></label></div><label for="draft-transitions">Transitions</label><p id="draft-format" class="hint"></p><textarea id="draft-transitions" rows="6" spellcheck="false"></textarea><label>Example input<input id="draft-word"></label><label class="review-checkbox"><input type="checkbox" id="draft-confirm">I reviewed the reading, transitions, and any assumptions.</label></div>
 <button id="question-apply" class="primary">Use draft & build diagram</button></section>
 </dialog>
-<script src="pda.js?v=import-1"></script><script src="app.js?v=import-1"></script><script src="symbol-input.js?v=import-1"></script><script src="workbench.js?v=import-1"></script>
-<script src="question-import.js?v=import-1"></script></body></html>
+<script src="pda.js?v=chat-import-1"></script><script src="app.js?v=chat-import-1"></script><script src="symbol-input.js?v=chat-import-1"></script><script src="workbench.js?v=chat-import-1"></script>
+<script src="question-import.js?v=chat-import-1"></script></body></html>

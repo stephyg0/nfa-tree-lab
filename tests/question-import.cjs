@@ -17,3 +17,20 @@ elements['draft-transitions'].value=draft.transitions;elements['question-apply']
 draft.status='needs_clarification';draft.clarification='Which state is final?';await elements['question-read'].onclick();assert.equal(elements['draft-fields'].hidden,true);assert.equal(elements['question-apply'].hidden,true);assert.match(elements['question-status'].textContent,/Which state/);
 console.log('Passed mocked draft review, explicit confirmation, invalid-draft preservation, apply and clarification flows.');
 })().catch(e=>{console.error(e);process.exitCode=1});
+
+// Chat import is local and shares the same review-before-apply flow.
+setImmediate(()=>{
+ try{
+ const sample={machine:'pda',start:'q0',accept:'q1',transitions:'q0, eps, eps, $, q1',word:''};
+ ctx.chatSample=JSON.stringify(sample);
+ const parsed=run('parseChatDraft(chatSample)');assert.equal(parsed.machine,'pda');assert.equal(parsed.status,'ready');
+ ctx.chatSample='```json\n'+JSON.stringify(sample)+'\n```';assert.equal(run('parseChatDraft(chatSample)').start,'q0');
+ for(const bad of ['not JSON','null','[]','{"machine":"tm"}',JSON.stringify({...sample,warnings:[{}]}),JSON.stringify({...sample,machine:'dfa'})]){ctx.bad=bad;assert.throws(()=>run('parseChatDraft(bad)'));}
+ run('questionReady=false');ctx.fetch=()=>{throw Error('Chat import must not call a server')};
+ elements['chat-answer'].value=JSON.stringify(sample);const before=elements.transitions.value;
+ elements['chat-review'].onclick();assert.equal(elements['draft-review'].hidden,false);assert.equal(elements.transitions.value,before);assert.equal(elements['draft-confirm'].checked,false);
+ elements['draft-confirm'].checked=true;elements['question-apply'].onclick();assert.equal(elements.machine.value,'pda');assert.equal(elements.transitions.value,sample.transitions);
+ elements['chat-answer'].value='bad';elements['chat-review'].onclick();assert.equal(elements['draft-review'].hidden,true);assert.equal(elements.transitions.value,sample.transitions);
+ console.log('Passed local chat JSON/code-fence import, validation, no-key/no-network flow and PDA apply.');
+ }catch(e){console.error(e);process.exitCode=1}
+});

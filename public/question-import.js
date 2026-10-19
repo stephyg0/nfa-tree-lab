@@ -16,7 +16,7 @@ async function loadQuestionImage(file){
   importStatus(questionReady?'Screenshot ready. Choose Read question to continue.':'Screenshot ready. Automatic reading is awaiting AI setup.');
  }catch(error){if(version===questionVersion)importStatus(error.message)}
 }
-$('question-open').onclick=()=>{$('question-dialog').showModal();$('question-text').focus();};
+$('question-open').onclick=()=>{$('question-dialog').showModal();$('chat-answer').focus();};
 $('question-close').onclick=()=>{$('question-dialog').close();};
 $('question-file').onchange=event=>loadQuestionImage(event.target.files[0]);
 $('question-browse').onclick=()=>$('question-file').click();
@@ -37,12 +37,7 @@ $('question-read').onclick=async()=>{
   const result=await response.json();if(version!==questionVersion)return;
   if(!response.ok)throw Error(result.error||'Could not read this question.');
   const draft=result.draft;if(!draft||typeof draft.transcription!=='string')throw Error('The response was incomplete. Please try again.');
-  $('question-transcription').textContent=draft.transcription;$('question-explanation').textContent=draft.explanation;
-  $('question-warnings').textContent=(draft.warnings||[]).join('\n');
-  $('draft-review').hidden=false;$('draft-fields').hidden=draft.status!=='ready';$('question-apply').hidden=draft.status!=='ready';$('draft-confirm').checked=false;
-  if(draft.status!=='ready'){importStatus(draft.clarification||'More detail is needed. Add it to your question and try again.');return;}
-  for(const field of ['machine','start','accept','alphabet','transitions','word'])$('draft-'+field).value=draft[field];
-  updateDraftFormat();importStatus('Review the draft against the question, then build it. AI proposals can be wrong.');
+  showQuestionDraft(draft);
  }catch(error){if(version===questionVersion&&error.name!=='AbortError')importStatus(error.message||'Connection interrupted. Try again.');}
  finally{if(version===questionVersion){questionRequest=null;$('question-read').disabled=!questionReady;}}
 };
@@ -62,3 +57,40 @@ function applyQuestionDraft(){
 }
 $('question-apply').onclick=applyQuestionDraft;
 fetch('/api/import-config').then(r=>{if(!r.ok)throw Error();return r.json()}).then(config=>{questionReady=config.ready===true;$('question-read').disabled=!questionReady;$('question-setup').hidden=questionReady;}).catch(()=>{$('question-setup').hidden=false;$('question-setup').textContent='Question reading is unavailable right now. Your diagram editor still works.';});
+
+function showQuestionDraft(draft){
+  $('question-transcription').textContent=draft.transcription;$('question-explanation').textContent=draft.explanation;
+  $('question-warnings').textContent=(draft.warnings||[]).join('\n');
+  $('draft-review').hidden=false;$('draft-fields').hidden=draft.status!=='ready';$('question-apply').hidden=draft.status!=='ready';$('draft-confirm').checked=false;
+  if(draft.status!=='ready'){importStatus(draft.clarification||'More detail is needed. Add it to your question and try again.');return;}
+  for(const field of ['machine','start','accept','alphabet','transitions','word'])$('draft-'+field).value=draft[field];
+  updateDraftFormat();importStatus('Review the draft against the question, then build it. AI proposals can be wrong.');
+}
+
+const chatImportPrompt = `Read my question or screenshot and propose the requested DFA, NFA, or PDA. Return one JSON object for Automata Lab, with these fields:
+{"machine":"nfa","start":"q0","accept":"q1","alphabet":"a, b","transitions":"q0, a, q1","word":"a","transcription":"The question as read","explanation":"Brief reasoning and assumptions","warnings":[]}
+Use machine dfa, nfa, or pda. All fields except warnings are strings; warnings is an array of strings. Final states are comma-separated (empty string for none); alphabet is comma-separated single characters. State names must be 1–16 letters, digits, underscores, or hyphens. Transitions is a newline-separated string: from, input, to for DFA/NFA; from, input, pop, push, to for PDA. Use eps for epsilon. Input and stack symbols are single characters; no commas or whitespace as symbols. DFA transitions must cover every state and alphabet symbol, with no epsilon or conflicts. PDA starts with an empty stack and accepts by final state only after consuming all input; stack top is on the left. Include needed stack initialization transitions. Use an empty word if no test input is supplied. Do not invent missing or illegible details: ask me to clarify before producing JSON. The example above demonstrates the format only; build the machine for MY question.`;
+$('chat-prompt').value=chatImportPrompt;
+$('chat-copy-prompt').onclick=async()=>{
+ try{await navigator.clipboard.writeText(chatImportPrompt);importStatus('Prompt copied. Paste it in chat with your question or screenshot.');}
+ catch{$('chat-prompt').focus();$('chat-prompt').select();importStatus('Select and copy the highlighted prompt with ⌘C / Ctrl+C.');}
+};
+function parseChatDraft(raw){
+ if(raw.length>50000)throw Error('Paste an answer under 50,000 characters.');
+ let text=raw.trim();
+ const fence=text.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i);if(fence)text=fence[1];
+ let value;try{value=JSON.parse(text)}catch{throw Error('Paste only the JSON answer from chat, with or without its code block.');}
+ if(!value||typeof value!=='object'||Array.isArray(value))throw Error('The answer must be a JSON object.');
+ if(!['dfa','nfa','pda'].includes(value.machine))throw Error('Machine must be dfa, nfa, or pda.');
+ for(const key of ['start','accept','transitions'])if(typeof value[key]!=='string')throw Error('The answer needs a '+key+' string.');
+ for(const key of ['alphabet','word','transcription','explanation'])if(value[key]!==undefined&&typeof value[key]!=='string')throw Error(key+' must be a string.');
+ if(value.warnings!==undefined&&(!Array.isArray(value.warnings)||value.warnings.some(w=>typeof w!=='string')))throw Error('Warnings must be a list of text strings.');
+ if(value.machine==='dfa'&&!value.alphabet?.trim())throw Error('Include the alphabet for this DFA.');
+ return {status:'ready',machine:value.machine,start:value.start,accept:value.accept,transitions:value.transitions,alphabet:value.alphabet||'',word:value.word||'',transcription:value.transcription||'',explanation:value.explanation||'',warnings:value.warnings||[]};
+}
+$('chat-answer').addEventListener('input',()=>{invalidateQuestion();importStatus('');});
+$('chat-review').onclick=()=>{
+ invalidateQuestion();
+ try{showQuestionDraft(parseChatDraft($('chat-answer').value));importStatus('Review the imported machine and any assumptions, then build it.');}
+ catch(error){importStatus(error.message);}
+};
