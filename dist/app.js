@@ -54,7 +54,7 @@ function compute(m){
 let model,tree,level=0,selected=0,scale=1,diagramMode="tree";
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const remainder=n=>model.chars.slice(n.i).join('')||'ε';
-function build(){if(typeof refreshSymbols==='function')refreshSymbols();try{const m=($('machine').value==='pda'?parsePda:parse)($('start').value.trim(),$('accept').value,$('transitions').value,diagramMode==='states'?'':$('word').value);const t=m.pda?computePda(m):compute(m);model=m;tree=t;level=t.maxDepth;selected=0;$('error').textContent='';$('result').textContent=pdaStatus();$('result').style.color=t.accepted===null?'#805c15':t.accepted?'#147a64':'#a13c49';$('explanation').textContent=t.accepted?'At least one computation consumes the entire string and reaches an accepting state.':'No computation consumes the entire string and reaches an accepting state.';$('word-display').textContent=m.chars.join('')||'ε';$('notice').textContent=[t.limited?(m.pda?'Search limited to 450 nodes or 60 stack symbols. Dashed nodes have unexplored branches. A missing accepting path is inconclusive.':'Display limited to 450 nodes. Dashed nodes have hidden branches; the acceptance result remains exact.'):'',t.hasEpsilon?'Arrows labeled ε are explicit moves on the same row: they consume no input.':'',t.hasCycles?'↩ marks a repeated configuration on a branch. Its infinite repeated subtree is folded.':''].filter(Boolean).join(' ');render();return {accepted:t.accepted,displayedNodes:t.nodes.length,limited:t.limited}}catch(e){$('error').textContent=e.message;return {error:e.message}}}
+function build(){if(typeof updateWorkbench==='function')updateWorkbench();if(typeof refreshSymbols==='function')refreshSymbols();try{const m=($('machine').value==='pda'?parsePda:$('machine').value==='dfa'?parseDfa:parse)($('start').value.trim(),$('accept').value,$('transitions').value,diagramMode==='states'?'':$('word').value);const t=m.pda?computePda(m):compute(m);model=m;tree=t;$('tree').hidden=false;level=t.maxDepth;selected=0;$('error').textContent='';$('result').textContent=pdaStatus();$('result').style.color=t.accepted===null?'#805c15':t.accepted?'#147a64':'#a13c49';$('explanation').textContent=t.accepted?'At least one computation consumes the entire string and reaches an accepting state.':'No computation consumes the entire string and reaches an accepting state.';$('word-display').textContent=m.chars.join('')||'ε';$('notice').textContent=[t.limited?(m.pda?'Search limited to 450 nodes or 60 stack symbols. Dashed nodes have unexplored branches. A missing accepting path is inconclusive.':'Display limited to 450 nodes. Dashed nodes have hidden branches; the acceptance result remains exact.'):'',t.hasEpsilon?'Arrows labeled ε are explicit moves on the same row: they consume no input.':'',t.hasCycles?'↩ marks a repeated configuration on a branch. Its infinite repeated subtree is folded.':''].filter(Boolean).join(' ');render();return {accepted:t.accepted,displayedNodes:t.nodes.length,limited:t.limited}}catch(e){$('error').textContent=e.message;$('tree').hidden=true;$('result').textContent='Check the definition';$('detail').textContent='Fix the definition and build again to see a result.';$('notice').textContent='';$('explanation').textContent='';return {error:e.message}}}
 function stateLabel(s){
  const match=s.match(/^(.+?)(\d+)$/u);
  return match?`${esc(match[1])}<tspan baseline-shift="sub" font-size="12">${esc(match[2])}</tspan>`:esc(s);
@@ -120,7 +120,7 @@ function diagramImage(d,filename){
 }
 function exportImage(){
  if(diagramMode==='states')return exportStateDiagram();
- return diagramImage(diagram(tree.maxDepth,-1,true),`${model.pda?'pda':'nfa'}-tree-${(model.chars.join('')||'empty').replace(/[^a-zA-Z0-9_-]/g,'_')}`);
+ return diagramImage(diagram(tree.maxDepth,-1,true),`${model.pda?'pda':model.dfa?'dfa':'nfa'}-tree-${(model.chars.join('')||'empty').replace(/[^a-zA-Z0-9_-]/g,'_')}`);
 }
 function saveImage(blob,extension,filename){
  const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`${filename}.${extension}`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
@@ -174,7 +174,7 @@ function stateDiagram(){
  const pos=new Map();
  names.forEach((s,i)=>{const angle=Math.PI+2*Math.PI*i/count;pos.set(s,{x:cx+radius*Math.cos(angle),y:cy+radius*Math.sin(angle),angle});});
  const groups=new Map();for(const e of model.edges){const key=JSON.stringify([e.from,e.to]);if(!groups.has(key))groups.set(key,{from:e.from,to:e.to,symbols:[]});groups.get(key).symbols.push(transitionLabel(e));}
- let out='<title>NFA state diagram. Labeled arrows show transitions, the incoming start arrow marks the initial state, and double circles mark accepting states.</title><defs><marker id="state-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 L3 5 Z" fill="#172847"/></marker></defs>';
+ let out='<title>Automaton state diagram. Labeled arrows show transitions, the incoming start arrow marks the initial state, and double circles mark accepting states.</title><defs><marker id="state-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 L3 5 Z" fill="#172847"/></marker></defs>';
  const labels=[];
  for(const g of groups.values()){
   const p=pos.get(g.from),q=pos.get(g.to);let d,lx,ly;
@@ -219,7 +219,7 @@ function viewControls(){
  $('input-string-controls').hidden=states;$('step-controls').hidden=states;$('word-display').hidden=states;
  $('legend').innerHTML=states?'<span>Incoming arrow = start</span><span>Double circle = accepting state</span><span>ε = no input consumed</span>':'<span>Double circle = accepts here</span><span>Bold path = accepting computation</span><span>ε arrow = no input consumed</span>';
  $('inspector-title').textContent=states?'State details':'Selected path';
- $('tree').setAttribute('aria-label',(model.pda?'PDA':'NFA')+(states?' state diagram':' computation tree'));if(model.pda&&!states)$('legend').innerHTML+='<span>Stack top is on the left · ε = empty stack</span>';if(tree.accepted===null)$('explanation').textContent='Unexplored branches remain; acceptance is not yet determined.';
+ $('tree').setAttribute('aria-label',(model.pda?'PDA':model.dfa?'DFA':'NFA')+(states?' state diagram':' computation tree'));if(model.pda&&!states)$('legend').innerHTML+='<span>Stack top is on the left · ε = empty stack</span>';if(tree.accepted===null)$('explanation').textContent='Unexplored branches remain; acceptance is not yet determined.';
  $('viewport').setAttribute('aria-label',states?'State diagram, scroll to explore':'Computation tree, scroll to explore');
 }
 function renderStateDiagram(){
@@ -234,7 +234,7 @@ function describeState(s){
  $('detail').textContent=`${s}${s===model.start?' (start)':''}${model.finals.has(s)?' (accepting)':''}. Outgoing: ${outgoing.join('; ')||'none'}. Incoming: ${incoming.join('; ')||'none'}.`;
 }
 function exportStateDiagram(){
- return diagramImage(stateDiagram(),model.pda?'pda-state-diagram':'nfa-state-diagram');
+ return diagramImage(stateDiagram(),model.pda?'pda-state-diagram':model.dfa?'dfa-state-diagram':'nfa-state-diagram');
 }
 
 $('view-tree').onclick=()=>setView('tree');$('view-states').onclick=()=>setView('states');

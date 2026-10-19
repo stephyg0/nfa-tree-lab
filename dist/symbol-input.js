@@ -11,6 +11,7 @@ function symbolButton(symbol,action,label){
  button.setAttribute('aria-label',label||`Insert ${symbol}`);button.onclick=action;return button;
 }
 function refreshSymbols(){
+ if(typeof refreshTransitionList==='function')refreshTransitionList();
  const pda=$('machine').value==='pda';$('stack-fields').hidden=!pda;
  if(!pda&&(symbolTarget===$('edge-pop')||symbolTarget===$('edge-push')))symbolTarget=$('transitions');
  const symbols=new Set();
@@ -39,9 +40,12 @@ $('add-transition').onclick=()=>{
  const values=['edge-from','edge-input',...(pda?['edge-pop','edge-push']:[]),'edge-to'].map(id=>$(id).value.trim());
  try{
   if(values.some(value=>!value))throw Error('Fill every transition field. Use ε or eps for no input, pop, or push.');
-  const text=[$('transitions').value.trim(),values.join(', ')].filter(Boolean).join('\n');
+  const lines=$('transitions').value.split('\n').filter(s=>s.trim());
+  const editing=$('editing-index')?.value;
+  if(editing!==undefined&&editing!=='')lines[Number(editing)]=values.join(', ');else lines.push(values.join(', '));
+  const text=lines.join('\n');
   (pda?parsePda:parse)($('start').value.trim(),$('accept').value,text,'');
-  $('transitions').value=text;refreshSymbols();$('transition-status').textContent='Transition added. Choose Build to update the diagram.';
+  $('transitions').value=text;if(typeof resetTransitionEditor==='function')resetTransitionEditor();refreshSymbols();if(typeof markDirty==='function')markDirty();$('transition-status').textContent='Transition added. Choose Build to update the diagram.';
  }catch(error){$('transition-status').textContent=error.message;}
 };
 examples.letters={start:'q0',accept:'q2',word:'aab',transitions:'q0, a, q1\nq1, a, q1\nq1, b, q2'};
